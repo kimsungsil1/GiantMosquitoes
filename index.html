@@ -44,11 +44,10 @@
 
     let player, enemies, score, running;
 
-    // 난이도 조절을 위한 전역 변수
-    let globalDifficultySpeedIncrease = 0; // 인간 속도에 추가될 값
-    const DIFFICULTY_INTERVAL_SECONDS = 10; // 난이도 상승 주기 (초)
-    const FRAMES_PER_SECOND = 60; // 대략적인 프레임 수 (requestAnimationFrame 기준)
-    let lastDifficultyIncreaseScore = 0; // 마지막으로 난이도가 상승한 시점의 점수
+    let globalDifficultySpeedIncrease = 0;
+    const DIFFICULTY_INTERVAL_SECONDS = 10;
+    const FRAMES_PER_SECOND = 60;
+    let lastDifficultyIncreaseScore = 0;
 
     class Player {
       constructor(x,y, color) {
@@ -96,17 +95,15 @@
         if (edge === 2) { this.x = Math.random()*W; this.y = -50; }
         if (edge === 3) { this.x = Math.random()*W; this.y = H + 50; }
 
-        this.size  = 25;
-        this.baseSpeed = 2.5 + Math.random()*2.5; // 각 인간의 기본 속도
-        this.vx = 0; // 속도 초기화 (다음 update에서 다시 계산하도록)
+        // 인간의 사이즈를 15 ~ 35 범위로 랜덤하게 설정
+        this.size  = 15 + Math.random() * 20; // 최소 15, 최대 35 (20은 35-15)
+        this.baseSpeed = 2.5 + Math.random()*2.5;
+        this.vx = 0;
         this.vy = 0;
       }
       update() {
-        // 현재 유효 속도는 기본 속도 + 전역 난이도 속도 증가분
         const currentEffectiveSpeed = this.baseSpeed + globalDifficultySpeedIncrease;
 
-        // vx, vy가 0일 때만 (새로운 목표를 설정해야 할 때) 속도 벡터를 다시 계산
-        // 이렇게 하면 난이도 상승 시 모든 인간의 속도가 즉시 반영됨
         if (this.vx === 0 && this.vy === 0) { 
           const dx = player.x - this.x;
           const dy = player.y - this.y;
@@ -125,50 +122,61 @@
         ctx.strokeStyle = 'rgba(200,0,0,0.7)';
         ctx.lineWidth = 3;
 
+        // 인간의 크기에 맞춰 머리, 몸통, 팔, 다리 그리기
+        const headRadius = this.size * 0.5;
+        const bodyLength = this.size;
+        const armLegLength = this.size * 0.7;
+        const armLegSpread = this.size * 0.5;
+
+        // 머리
         ctx.beginPath();
-        ctx.arc(this.x, this.y - this.size * 0.5, this.size * 0.5, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y - headRadius, headRadius, 0, Math.PI * 2);
         ctx.stroke();
 
+        // 몸통
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x, this.y + this.size);
+        ctx.lineTo(this.x, this.y + bodyLength);
         ctx.stroke();
 
+        // 팔
         ctx.beginPath();
-        ctx.moveTo(this.x, this.y + this.size * 0.2);
-        ctx.lineTo(this.x - this.size * 0.7, this.y + this.size * 0.7);
+        ctx.moveTo(this.x, this.y + bodyLength * 0.2);
+        ctx.lineTo(this.x - armLegSpread, this.y + bodyLength * 0.2 + armLegLength);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(this.x, this.y + this.size * 0.2);
-        ctx.lineTo(this.x + this.size * 0.7, this.y + this.size * 0.7);
+        ctx.moveTo(this.x, this.y + bodyLength * 0.2);
+        ctx.lineTo(this.x + armLegSpread, this.y + bodyLength * 0.2 + armLegLength);
         ctx.stroke();
 
+        // 다리
         ctx.beginPath();
-        ctx.moveTo(this.x, this.y + this.size);
-        ctx.lineTo(this.x - this.size * 0.5, this.y + this.size * 1.5);
+        ctx.moveTo(this.x, this.y + bodyLength);
+        ctx.lineTo(this.x - armLegSpread * 0.7, this.y + bodyLength + armLegLength);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(this.x, this.y + this.size);
-        ctx.lineTo(this.x + this.size * 0.5, this.y + this.size * 1.5);
+        ctx.moveTo(this.x, this.y + bodyLength);
+        ctx.lineTo(this.x + armLegSpread * 0.7, this.y + bodyLength + armLegLength);
         ctx.stroke();
       }
       hits(p) {
+        // 충돌 감지 로직도 인간의 크기에 따라 동적으로 계산
         const dx = this.x - p.x;
-        const dy = (this.y + this.size * 0.75) - p.y;
+        const dy = (this.y + this.size * 0.75) - p.y; 
         const distance = Math.hypot(dx, dy);
         
-        return distance < (this.size * 1.2) + (p.width / 2); 
+        // 인간의 대략적인 반경 (머리 + 몸통 일부)과 모기의 대략적인 반경을 더함
+        // this.size는 머리 반지름 기준이므로, 대략적인 충돌 범위는 this.size * 1.5 정도로 늘려줍니다.
+        return distance < (this.size * 1.5) + (p.width / 2); 
       }
     }
 
     function initGame() {
       document.body.classList.add('hide-cursor');
 
-      // 게임 시작 시 난이도 관련 변수 초기화
       globalDifficultySpeedIncrease = 0;
       lastDifficultyIncreaseScore = 0;
 
-      // 초기 인간 생성 개수 (기존 7명 유지)
       enemies = Array.from({length:7}, () => new Enemy()); 
       score   = 0;
       running = true;
@@ -185,13 +193,11 @@
         return;
       }
 
-      // 난이도 상승 로직 (10초마다)
       if (score > 0 && (score - lastDifficultyIncreaseScore) >= (DIFFICULTY_INTERVAL_SECONDS * FRAMES_PER_SECOND)) {
-        globalDifficultySpeedIncrease += 0.5; // 속도 증가량
-        enemies.push(new Enemy()); // 새로운 인간 1명 추가
-        lastDifficultyIncreaseScore = score; // 마지막 난이도 상승 시점 업데이트
+        globalDifficultySpeedIncrease += 0.5;
+        enemies.push(new Enemy()); 
+        lastDifficultyIncreaseScore = score;
 
-        // 모든 기존 인간의 속도를 즉시 반영하기 위해 속도 벡터 초기화
         enemies.forEach(enemy => {
           enemy.vx = 0;
           enemy.vy = 0;
