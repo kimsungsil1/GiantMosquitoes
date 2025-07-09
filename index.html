@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF="8" />
+  <meta charset="UTF-8" />
   <title>진격의 인간 (나는 모기)</title>
   <style>
     body { 
@@ -10,29 +10,21 @@
       background:#222; 
       color:#fff; 
       font-family:sans-serif;
-      display: flex; /* Flexbox를 사용하여 중앙 정렬 */
-      justify-content: center; /* 가로 중앙 정렬 */
-      align-items: center; /* 세로 중앙 정렬 */
-      height: 100vh; /* 뷰포트 높이 전체 사용 */
-      position: relative; /* UI 요소의 절대 위치 기준 */
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      height: 100vh; 
+      position: relative; 
     }
     .hide-cursor { cursor: none; } 
 
     #ui { 
-      position:absolute; /* 캔버스 위에 겹쳐지도록 절대 위치 지정 */
-      top: 10px; /* 기존 UI 위치 유지 */
-      left: 10px; /* 기존 UI 위치 유지 */
+      position:absolute; 
+      top: 10px; 
+      left: 10px; 
       z-index:10; 
-      /* 게임 시작 버튼 중앙 배치를 위한 초기 UI 위치를 변경 */
-      /* display: flex; */ /* 이 div 자체는 flexbox로 정렬할 필요 없음 */
-      /* flex-direction: column; */
-      /* align-items: center; */
-      /* justify-content: center; */
-      /* width: 100%; */
-      /* height: 100%; */
     }
 
-    /* 게임 시작 버튼을 감싸는 새로운 컨테이너 스타일 */
     #startScreen {
       position: absolute;
       top: 0;
@@ -43,14 +35,14 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      z-index: 11; /* UI보다 위에 위치 */
-      background-color: rgba(0, 0, 0, 0.7); /* 게임 시작 전 배경 어둡게 */
+      z-index: 11;
+      background-color: rgba(0, 0, 0, 0.7);
       transition: opacity 0.5s ease-in-out;
     }
 
     #startScreen.hidden {
       opacity: 0;
-      pointer-events: none; /* 클릭 이벤트 비활성화 */
+      pointer-events: none;
     }
 
     #startScreen h1 {
@@ -59,7 +51,7 @@
     }
 
     #startScreen #charSelect, #startScreen #startBtn {
-      font-size: 20px; /* 버튼과 셀렉트 박스 크기 키우기 */
+      font-size: 20px; 
       padding: 10px 20px;
       margin: 10px;
     }
@@ -67,7 +59,7 @@
 </head>
 <body>
   <div id="ui">
-    <span id="score">점수: 0</span>
+    <span id="score">점수: 0초</span>
   </div>
 
   <div id="startScreen">
@@ -89,9 +81,6 @@
     function resize() {
       W = canvas.width = innerWidth;
       H = canvas.height = innerHeight;
-      // 캔버스 크기 변경 시 마우스 위치 초기화 (옵션)
-      // mouseX = W / 2;
-      // mouseY = H / 2;
     }
     window.addEventListener('resize', resize);
     resize();
@@ -100,7 +89,6 @@
     let mouseY = H / 2;
 
     window.addEventListener('mousemove', e => {
-      // 게임이 실행 중일 때만 마우스 좌표 업데이트 및 커서 숨김 적용
       if (running) {
         mouseX = e.clientX;
         mouseY = e.clientY;
@@ -117,37 +105,91 @@
     class Player {
       constructor(x,y, color) {
         this.x = x; this.y = y;
-        this.width = 15;
-        this.height = 30;
+        this.size = 20; // 모기의 대략적인 크기 기준점
         this.color = color;
       }
       update() {
         this.x = mouseX;
         this.y = mouseY;
 
-        this.x = Math.max(this.width / 2, Math.min(W - this.width / 2, this.x));
-        this.y = Math.max(this.height / 2, Math.min(H - this.height / 2, this.y));
+        // 모기 전체 크기를 고려한 화면 경계 제한
+        this.x = Math.max(this.size * 1.5, Math.min(W - this.size * 1.5, this.x));
+        this.y = Math.max(this.size * 1.5, Math.min(H - this.size * 1.5, this.y));
       }
       draw() {
-        ctx.fillStyle = this.color;
+        const bodyColor = this.color;
+        const wingColor = 'rgba(255, 255, 255, 0.3)'; // 투명한 날개색
+
+        ctx.save(); // 현재 그리기 상태 저장
+        ctx.translate(this.x, this.y); // 모기 중심을 기준으로 그림
+        ctx.rotate(Math.atan2(mouseY - this.y, mouseX - this.x) + Math.PI / 2); // 마우스를 따라 회전 (세로축 기준)
+
+        // 몸통 (앞은 둥글고 뒤는 뾰족한 형태)
+        ctx.fillStyle = bodyColor;
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y, this.width / 2, this.height / 2, Math.PI / 4, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, this.size * 0.6, this.size * 1.2, 0, 0, Math.PI * 2);
         ctx.fill();
 
+        // 머리 (작은 원)
         ctx.beginPath();
-        ctx.arc(this.x + Math.cos(Math.PI / 4) * (this.height / 2 - 5), 
-                this.y + Math.sin(Math.PI / 4) * (this.height / 2 - 5), 
-                5, 0, Math.PI * 2);
+        ctx.arc(0, -this.size * 0.8, this.size * 0.3, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.strokeStyle = this.color;
-        ctx.lineWidth = 1;
+        // 주둥이 (빨대)
+        ctx.strokeStyle = bodyColor;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x - 10, this.y - 20);
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x + 10, this.y - 20);
+        ctx.moveTo(0, -this.size * 1.1);
+        ctx.lineTo(0, -this.size * 1.4);
         ctx.stroke();
+
+        // 날개 (투명하게)
+        ctx.fillStyle = wingColor;
+        ctx.beginPath();
+        ctx.ellipse(-this.size * 0.5, -this.size * 0.3, this.size * 0.8, this.size * 0.3, Math.PI / 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(this.size * 0.5, -this.size * 0.3, this.size * 0.8, this.size * 0.3, -Math.PI / 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 다리 (길고 가늘게)
+        ctx.strokeStyle = bodyColor;
+        ctx.lineWidth = 1.5;
+        // 앞 다리
+        ctx.beginPath();
+        ctx.moveTo(-this.size * 0.4, -this.size * 0.6);
+        ctx.lineTo(-this.size * 1.2, -this.size * 0.9);
+        ctx.lineTo(-this.size * 1.5, -this.size * 0.3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(this.size * 0.4, -this.size * 0.6);
+        ctx.lineTo(this.size * 1.2, -this.size * 0.9);
+        ctx.lineTo(this.size * 1.5, -this.size * 0.3);
+        ctx.stroke();
+        // 중간 다리
+        ctx.beginPath();
+        ctx.moveTo(-this.size * 0.5, 0);
+        ctx.lineTo(-this.size * 1.3, this.size * 0.3);
+        ctx.lineTo(-this.size * 1.6, -0.2 * this.size); // 다리 끝점 추가
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(this.size * 0.5, 0);
+        ctx.lineTo(this.size * 1.3, this.size * 0.3);
+        ctx.lineTo(this.size * 1.6, -0.2 * this.size);
+        ctx.stroke();
+        // 뒷 다리
+        ctx.beginPath();
+        ctx.moveTo(-this.size * 0.4, this.size * 0.6);
+        ctx.lineTo(-this.size * 1.2, this.size * 0.9);
+        ctx.lineTo(-this.size * 1.5, this.size * 0.3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(this.size * 0.4, this.size * 0.6);
+        ctx.lineTo(this.size * 1.2, this.size * 0.9);
+        ctx.lineTo(this.size * 1.5, this.size * 0.3);
+        ctx.stroke();
+
+        ctx.restore(); // 저장된 그리기 상태 복원
       }
     }
 
@@ -228,9 +270,8 @@
     }
 
     function initGame() {
-      // 게임 시작 화면 숨기기
       document.getElementById('startScreen').classList.add('hidden');
-      document.body.classList.add('hide-cursor'); // 게임 시작 시 커서 숨김
+      document.body.classList.add('hide-cursor');
 
       globalDifficultySpeedIncrease = 0;
       lastDifficultyIncreaseScore = 0;
@@ -239,16 +280,15 @@
       score   = 0;
       running = true;
       const choice = document.getElementById('charSelect').value;
-      const color  = (choice === 'levi' ? '#a0f' : '#0fa');
+      const color  = (choice === 'levi' ? '#a0f' : '#0fa'); // 모기 색상 선택
       player = new Player(W/2, H/2, color);
-      document.getElementById('score').textContent = '점수: 0';
+      document.getElementById('score').textContent = '점수: 0초'; 
       requestAnimationFrame(loop);
     }
 
     function loop() {
       if (!running) {
-        document.body.classList.remove('hide-cursor'); // 게임 종료 시 커서 다시 보이게 함
-        // 게임 시작 화면 다시 보여주기 (옵션)
+        document.body.classList.remove('hide-cursor');
         document.getElementById('startScreen').classList.remove('hidden');
         return;
       }
@@ -270,7 +310,8 @@
 
       if (enemies.some(enemy => enemy.hits(player))) {
         running = false;
-        alert('인간에게 잡혔다! 최종 생존 시간: ' + score + '초');
+        const finalSurvivalTime = Math.floor(score / FRAMES_PER_SECOND); 
+        alert('인간에게 잡혔다! 최종 생존 시간: ' + finalSurvivalTime + '초');
         return;
       }
       ctx.clearRect(0,0,W,H);
@@ -278,7 +319,7 @@
       enemies.forEach(enemy => enemy.draw());
 
       score++;
-      document.getElementById('score').textContent = '점수: ' + score;
+      document.getElementById('score').textContent = '점수: ' + Math.floor(score / FRAMES_PER_SECOND) + '초';
       requestAnimationFrame(loop);
     }
 
