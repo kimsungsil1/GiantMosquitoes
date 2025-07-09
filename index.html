@@ -1,25 +1,84 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF="8" />
   <title>진격의 인간 (나는 모기)</title>
   <style>
-    body { margin:0; overflow:hidden; background:#222; color:#fff; font-family:sans-serif; }
+    body { 
+      margin:0; 
+      overflow:hidden; 
+      background:#222; 
+      color:#fff; 
+      font-family:sans-serif;
+      display: flex; /* Flexbox를 사용하여 중앙 정렬 */
+      justify-content: center; /* 가로 중앙 정렬 */
+      align-items: center; /* 세로 중앙 정렬 */
+      height: 100vh; /* 뷰포트 높이 전체 사용 */
+      position: relative; /* UI 요소의 절대 위치 기준 */
+    }
     .hide-cursor { cursor: none; } 
 
-    #ui { position:absolute; top:10px; left:10px; z-index:10; }
-    #ui select, #ui button { font-size:16px; margin-right:10px; }
+    #ui { 
+      position:absolute; /* 캔버스 위에 겹쳐지도록 절대 위치 지정 */
+      top: 10px; /* 기존 UI 위치 유지 */
+      left: 10px; /* 기존 UI 위치 유지 */
+      z-index:10; 
+      /* 게임 시작 버튼 중앙 배치를 위한 초기 UI 위치를 변경 */
+      /* display: flex; */ /* 이 div 자체는 flexbox로 정렬할 필요 없음 */
+      /* flex-direction: column; */
+      /* align-items: center; */
+      /* justify-content: center; */
+      /* width: 100%; */
+      /* height: 100%; */
+    }
+
+    /* 게임 시작 버튼을 감싸는 새로운 컨테이너 스타일 */
+    #startScreen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 11; /* UI보다 위에 위치 */
+      background-color: rgba(0, 0, 0, 0.7); /* 게임 시작 전 배경 어둡게 */
+      transition: opacity 0.5s ease-in-out;
+    }
+
+    #startScreen.hidden {
+      opacity: 0;
+      pointer-events: none; /* 클릭 이벤트 비활성화 */
+    }
+
+    #startScreen h1 {
+      font-size: 3em;
+      margin-bottom: 20px;
+    }
+
+    #startScreen #charSelect, #startScreen #startBtn {
+      font-size: 20px; /* 버튼과 셀렉트 박스 크기 키우기 */
+      padding: 10px 20px;
+      margin: 10px;
+    }
   </style>
 </head>
 <body>
   <div id="ui">
+    <span id="score">점수: 0</span>
+  </div>
+
+  <div id="startScreen">
+    <h1>진격의 인간</h1>
     <select id="charSelect">
       <option value="levi">강철 모기 (리바이)</option>
       <option value="eren">돌진 모기 (에렌)</option>
     </select>
     <button id="startBtn">게임 시작</button>
-    <span id="score">점수: 0</span>
   </div>
+
   <canvas id="game"></canvas>
 
   <script>
@@ -30,6 +89,9 @@
     function resize() {
       W = canvas.width = innerWidth;
       H = canvas.height = innerHeight;
+      // 캔버스 크기 변경 시 마우스 위치 초기화 (옵션)
+      // mouseX = W / 2;
+      // mouseY = H / 2;
     }
     window.addEventListener('resize', resize);
     resize();
@@ -38,14 +100,17 @@
     let mouseY = H / 2;
 
     window.addEventListener('mousemove', e => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
+      // 게임이 실행 중일 때만 마우스 좌표 업데이트 및 커서 숨김 적용
+      if (running) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+      }
     });
 
     let player, enemies, score, running;
 
     let globalDifficultySpeedIncrease = 0;
-    const DIFFICULTY_INTERVAL_SECONDS = 10;
+    const DIFFICULTY_INTERVAL_SECONDS = 5;
     const FRAMES_PER_SECOND = 60;
     let lastDifficultyIncreaseScore = 0;
 
@@ -95,9 +160,8 @@
         if (edge === 2) { this.x = Math.random()*W; this.y = -50; }
         if (edge === 3) { this.x = Math.random()*W; this.y = H + 50; }
 
-        // 인간의 사이즈를 15 ~ 35 범위로 랜덤하게 설정
-        this.size  = 15 + Math.random() * 20; // 최소 15, 최대 35 (20은 35-15)
-        this.baseSpeed = 2.5 + Math.random()*2.5;
+        this.size  = 15 + Math.random() * 20; 
+        this.baseSpeed = 3.5 + Math.random()*3.0; 
         this.vx = 0;
         this.vy = 0;
       }
@@ -122,24 +186,20 @@
         ctx.strokeStyle = 'rgba(200,0,0,0.7)';
         ctx.lineWidth = 3;
 
-        // 인간의 크기에 맞춰 머리, 몸통, 팔, 다리 그리기
         const headRadius = this.size * 0.5;
         const bodyLength = this.size;
         const armLegLength = this.size * 0.7;
         const armLegSpread = this.size * 0.5;
 
-        // 머리
         ctx.beginPath();
         ctx.arc(this.x, this.y - headRadius, headRadius, 0, Math.PI * 2);
         ctx.stroke();
 
-        // 몸통
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
         ctx.lineTo(this.x, this.y + bodyLength);
         ctx.stroke();
 
-        // 팔
         ctx.beginPath();
         ctx.moveTo(this.x, this.y + bodyLength * 0.2);
         ctx.lineTo(this.x - armLegSpread, this.y + bodyLength * 0.2 + armLegLength);
@@ -149,7 +209,6 @@
         ctx.lineTo(this.x + armLegSpread, this.y + bodyLength * 0.2 + armLegLength);
         ctx.stroke();
 
-        // 다리
         ctx.beginPath();
         ctx.moveTo(this.x, this.y + bodyLength);
         ctx.lineTo(this.x - armLegSpread * 0.7, this.y + bodyLength + armLegLength);
@@ -160,24 +219,23 @@
         ctx.stroke();
       }
       hits(p) {
-        // 충돌 감지 로직도 인간의 크기에 따라 동적으로 계산
         const dx = this.x - p.x;
         const dy = (this.y + this.size * 0.75) - p.y; 
         const distance = Math.hypot(dx, dy);
         
-        // 인간의 대략적인 반경 (머리 + 몸통 일부)과 모기의 대략적인 반경을 더함
-        // this.size는 머리 반지름 기준이므로, 대략적인 충돌 범위는 this.size * 1.5 정도로 늘려줍니다.
         return distance < (this.size * 1.5) + (p.width / 2); 
       }
     }
 
     function initGame() {
-      document.body.classList.add('hide-cursor');
+      // 게임 시작 화면 숨기기
+      document.getElementById('startScreen').classList.add('hidden');
+      document.body.classList.add('hide-cursor'); // 게임 시작 시 커서 숨김
 
       globalDifficultySpeedIncrease = 0;
       lastDifficultyIncreaseScore = 0;
 
-      enemies = Array.from({length:7}, () => new Enemy()); 
+      enemies = Array.from({length:12}, () => new Enemy()); 
       score   = 0;
       running = true;
       const choice = document.getElementById('charSelect').value;
@@ -189,12 +247,15 @@
 
     function loop() {
       if (!running) {
-        document.body.classList.remove('hide-cursor');
+        document.body.classList.remove('hide-cursor'); // 게임 종료 시 커서 다시 보이게 함
+        // 게임 시작 화면 다시 보여주기 (옵션)
+        document.getElementById('startScreen').classList.remove('hidden');
         return;
       }
 
       if (score > 0 && (score - lastDifficultyIncreaseScore) >= (DIFFICULTY_INTERVAL_SECONDS * FRAMES_PER_SECOND)) {
-        globalDifficultySpeedIncrease += 0.5;
+        globalDifficultySpeedIncrease += 0.8; 
+        enemies.push(new Enemy()); 
         enemies.push(new Enemy()); 
         lastDifficultyIncreaseScore = score;
 
