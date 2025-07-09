@@ -2,9 +2,9 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>진격의 모기 (Attack on Mosquito)</title>
+  <title>진격의 모기 ― Attack on Mosquito</title>
   <style>
-    * {box-sizing: border-box;}
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       overflow: hidden;
@@ -23,227 +23,210 @@
 </head>
 <body>
   <canvas id="game" width="960" height="640"></canvas>
-  <div id="score" hidden>Score&nbsp;0</div>
+  <div id="score" hidden>Score 0</div>
 
   <script>
-    const canvas   = document.getElementById('game');
-    const ctx      = canvas.getContext('2d');
-    const scoreUI  = document.getElementById('score');
+    const canvas  = document.getElementById('game');
+    const ctx     = canvas.getContext('2d');
+    const $score  = document.getElementById('score');
 
-    // ---------- GLOBAL STATE ----------
-    let gameState  = 'menu';   // 'menu' | 'play' | 'over'
-    let chosenType = null;     // 'levi' | 'eren'
+    // ───────── GLOBAL STATE ─────────
+    let gameState  = 'menu';          // 'menu' | 'play' | 'over'
+    let chosenType = null;            // 'levi' | 'eren'
     let score      = 0;
 
-    // ---------- INPUT ----------
+    // ───────── INPUT ─────────
     const keys = {};
     document.addEventListener('keydown', e => keys[e.key] = true);
     document.addEventListener('keyup',   e => keys[e.key] = false);
 
-    // ---------- CLICK (for menu) ----------
-    canvas.addEventListener('mousedown', handleMenuClick);
-    function handleMenuClick(e){
+    // ───────── CLICK (메뉴) ─────────
+    canvas.addEventListener('mousedown', onMenuClick);
+    function onMenuClick(e){
       if (gameState !== 'menu') return;
       const rect = canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
-
       if (mx>190 && mx<370 && my>260 && my<460) startGame('levi');
       if (mx>590 && mx<770 && my>260 && my<460) startGame('eren');
     }
 
-    // ---------- UTILS ----------
-    function rand(min,max){return Math.random()*(max-min)+min;}
-    function rectIntersect(a,b){return (a.x<a.x+b.w && a.x+a.w>b.x && a.y<a.y+b.h && a.y+a.h>b.y);} // not used
+    // ───────── UTILS ─────────
+    const rand = (min,max)=> Math.random()*(max-min)+min;
+    const rectIntersect = (a,b)=> a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
-    // ---------- ENTITIES ----------
-    class Mosquito{
+    // ───────── ENTITIES ─────────
+    class Mosquito {
       constructor(type){
-        this.type   = type;
-        this.size   = type==='levi'?14:18;
-        this.speed  = type==='levi'?4:3;
-        this.x      = canvas.width/2 - this.size/2;
-        this.y      = canvas.height/2 - this.size/2;
+        this.type = type;
+        this.size = type==='levi'?14:18;
+        this.speed= type==='levi'?4:3;
+        this.x = canvas.width/2 - this.size/2;
+        this.y = canvas.height/2 - this.size/2;
+        this.biteCooldown = 0;          // neck bite 연사 제한
       }
       update(){
         if(keys['ArrowUp']||keys['w'])   this.y -= this.speed;
         if(keys['ArrowDown']||keys['s']) this.y += this.speed;
         if(keys['ArrowLeft']||keys['a']) this.x -= this.speed;
         if(keys['ArrowRight']||keys['d'])this.x += this.speed;
-        // boundaries
         this.x = Math.max(0, Math.min(canvas.width - this.size, this.x));
         this.y = Math.max(0, Math.min(canvas.height - this.size, this.y));
+        if(this.biteCooldown>0) this.biteCooldown--;
       }
       draw(){
         ctx.save();
+        ctx.translate(this.x + this.size/2, this.y + this.size/2);
         // wings
-        ctx.translate(this.x+this.size/2, this.y+this.size/2);
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.fillStyle='rgba(255,255,255,0.7)';
         ctx.beginPath();
         ctx.ellipse(-4,-6,this.size/3,this.size/6,0,0,Math.PI*2);
         ctx.ellipse( 4,-6,this.size/3,this.size/6,0,0,Math.PI*2);
         ctx.fill();
-        // body different color per type
-        ctx.fillStyle = this.type==='levi' ? '#ffee00' : '#ff9900';
+        // body
+        ctx.fillStyle = this.type==='levi'? '#ffee00':'#ff9900';
         ctx.beginPath();
         ctx.ellipse(0,0,this.size/2,this.size/3,0,0,Math.PI*2);
         ctx.fill();
         ctx.restore();
       }
-      get rect(){return {x:this.x,y:this.y,w:this.size,h:this.size};}
+      get rect(){return {x:this.x,y:this.y,w:this.size,h:this.size,bottom: this.y+this.size};}
     }
 
-    class Human{
+    class Human {
       constructor(x,y){
-        this.baseW=40; this.baseH=80;
+        this.baseW = 40; this.baseH = 80;
         this.x=x; this.y=y;
-        this.cool=rand(60,180);
+        this.cool = rand(60,180);
+        this.hp   = 3;                     // 목 뱀파이어 bites to kill
       }
       update(){
-        if(this.cool>0) this.cool--; else {swats.push(new Swat(this)); this.cool=rand(120,240);}    
+        if(this.cool>0) this.cool--; else {swats.push(new Swat(this)); this.cool=rand(120,240);}  
       }
       draw(){
-        const scale = 0.6 + (this.y / canvas.height) * 0.4;
-        const w = this.baseW*scale;
-        const h = this.baseH*scale;
+        const scale = 0.6 + (this.y/canvas.height)*0.4;
+        const w=this.baseW*scale, h=this.baseH*scale;
         ctx.save();
         ctx.translate(this.x+w/2,this.y+h/2);
         ctx.scale(scale,scale);
         ctx.translate(-this.baseW/2,-this.baseH/2);
         // body gradient
-        const grad=ctx.createLinearGradient(0,0,0,this.baseH);
-        grad.addColorStop(0,'#d2b48c');
-        grad.addColorStop(1,'#8b5a2b');
-        ctx.fillStyle=grad;
-        ctx.fillRect(0,0,this.baseW,this.baseH);
+        const g=ctx.createLinearGradient(0,0,0,this.baseH);
+        g.addColorStop(0,'#d2b48c'); g.addColorStop(1,'#8b5a2b');
+        ctx.fillStyle=g; ctx.fillRect(0,0,this.baseW,this.baseH);
         // head
-        ctx.beginPath();
-        ctx.arc(this.baseW/2,-this.baseW/4,this.baseW/3,0,Math.PI*2);
+        ctx.beginPath(); ctx.arc(this.baseW/2,-this.baseW/4,this.baseW/3,0,Math.PI*2);
         ctx.fillStyle='#f1c27d'; ctx.fill();
         ctx.restore();
+        // neck debug (optional) → 표시 끄려면 주석
+        // const n=this.neckRect;
+        // ctx.strokeStyle='rgba(0,255,0,0.3)'; ctx.strokeRect(n.x,n.y,n.w,n.h);
       }
-      get rect(){return {x:this.x,y:this.y,w:this.baseW*(0.6 + (this.y / canvas.height) * 0.4),h:this.baseH*(0.6 + (this.y / canvas.height) * 0.4)}}
+      get rect(){const scale=0.6+(this.y/canvas.height)*0.4;return {x:this.x,y:this.y,w:this.baseW*scale,h:this.baseH*scale,bottom:this.y+this.baseH*scale};}
+      get neckRect(){
+        const r=this.rect;
+        return {x:r.x+r.w*0.25, y:r.y-r.w*0.2, w:r.w*0.5, h:r.h*0.15};
+      }
     }
 
-    class Swat{
+    class Swat {
       constructor(h){
-        this.x=h.x+h.baseW/2;
-        this.y=h.y+10; // start near head
+        this.x=h.x+h.baseW/2; this.y=h.y+10;
         this.r=0; this.maxR=70; this.alive=true;
       }
       update(){this.r+=6; if(this.r>this.maxR) this.alive=false;}
       draw(){ctx.strokeStyle='red'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2); ctx.stroke();}
-      get rect(){return {x:this.x-this.r,y:this.y-this.r,w:this.r*2,h:this.r*2}}
+      get rect(){return {x:this.x-this.r,y:this.y-this.r,w:this.r*2,h:this.r*2,bottom:this.y+this.r};}
     }
 
-    // ---------- GAME OBJECTS ----------
+    // ───────── GAME OBJECTS ─────────
     let player;
-    const humans=[];
-    let swats=[];
+    const humans=[]; let swats=[];
 
-    function initHumans(){
-      humans.length=0;
-      for(let i=0;i<5;i++) humans.push(new Human(rand(80,canvas.width-80), rand(50, canvas.height-150)));
-    }
+    function spawnHuman(){ humans.push(new Human(rand(80,canvas.width-120), rand(60, canvas.height-180))); }
+    function initHumans(){ humans.length=0; for(let i=0;i<6;i++) spawnHuman(); }
 
     function startGame(type){
       chosenType=type;
       player=new Mosquito(type);
       initHumans();
       swats=[];
-      score=0;
-      scoreUI.textContent='Score 0';
-      scoreUI.hidden=false;
+      score=0; $score.textContent='Score 0'; $score.hidden=false;
       gameState='play';
     }
 
     function updatePlay(){
       player.update();
-      humans.forEach(h=>{h.update(); if(rectIntersect(player.rect,h.rect)){score++; scoreUI.textContent='Score '+score;}});
+      // humans update & neck bite check
+      humans.forEach(h=>{
+        h.update();
+        if(player.biteCooldown===0 && rectIntersect(player.rect,h.neckRect)){
+          h.hp--; score+=5; $score.textContent='Score '+score; player.biteCooldown=30; // 약점은 5점
+          if(h.hp<=0){ // human dies
+            score+=10; $score.textContent='Score '+score;
+            const idx=humans.indexOf(h); if(idx>-1) humans.splice(idx,1);
+            spawnHuman();
+          }
+        }
+      });
+      // swats update
       swats=swats.filter(s=>s.alive);
-      swats.forEach(s=>{s.update(); if(rectIntersect(player.rect,s.rect)){gameState='over';}});
+      swats.forEach(s=>{ s.update(); if(rectIntersect(player.rect,s.rect)){ gameState='over'; } });
     }
 
     function drawPlay(){
-      // clear & simple ground gradient for depth
-      const bg=ctx.createLinearGradient(0,0,0,canvas.height);
-      bg.addColorStop(0,'#003'); bg.addColorStop(1,'#040');
-      ctx.fillStyle=bg; ctx.fillRect(0,0,canvas.width,canvas.height);
-
-      humans.forEach(h=>h.draw());
-      player.draw();
-      swats.forEach(s=>s.draw());
+      const bg=ctx.createLinearGradient(0,0,0,canvas.height); bg.addColorStop(0,'#021'); bg.addColorStop(1,'#042'); ctx.fillStyle=bg; ctx.fillRect(0,0,canvas.width,canvas.height);
+      // depth‑sorted rendering (y‑bottom)
+      const entities=[...humans, player, ...swats];
+      entities.sort((a,b)=> (a.bottom||a.y)-(b.bottom||b.y));
+      entities.forEach(ent=> ent.draw());
     }
 
-    // ---------- MENU ----------
+    // ───────── MENU 화면 ─────────
     function drawMenu(){
       ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.textAlign='center';
-      ctx.font='48px sans-serif';
-      ctx.fillStyle='#fff';
-      ctx.fillText('진격의 모기', canvas.width/2, 120);
-      ctx.font='24px sans-serif';
-      ctx.fillText('캐릭터를 선택하세요', canvas.width/2, 180);
-
-      // Levi card
-      drawCard(280,260,'levi','#ffee00');
-      // Eren card
-      drawCard(680,260,'eren','#ff9900');
+      ctx.textAlign='center'; ctx.fillStyle='#fff';
+      ctx.font='48px sans-serif'; ctx.fillText('진격의 모기', canvas.width/2, 120);
+      ctx.font='24px sans-serif'; ctx.fillText('캐릭터를 선택하세요', canvas.width/2, 180);
+      drawCard(280,260,'levi','#ffee00'); drawCard(680,260,'eren','#ff9900');
     }
-
     function drawCard(cx,cy,type,color){
       ctx.fillStyle='#222'; ctx.strokeStyle='#555'; ctx.lineWidth=3;
-      ctx.beginPath(); ctx.roundRect(cx-90,cy-100,180,200,12); ctx.fill(); ctx.stroke();
-      // mosquito icon
-      ctx.save();
-      ctx.translate(cx,cy-30);
-      ctx.fillStyle=color;
-      ctx.beginPath(); ctx.ellipse(0,0,20,12,0,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle='rgba(255,255,255,0.7)';
-      ctx.beginPath(); ctx.ellipse(-8,-15,12,6,0,0,Math.PI*2); ctx.ellipse(8,-15,12,6,0,0,Math.PI*2); ctx.fill();
-      ctx.restore();
-      // label
-      ctx.fillStyle='#fff'; ctx.font='20px sans-serif';
-      ctx.fillText(type==='levi'?'리바이 모기':'에렌 모기', cx, cy+70);
+      roundRect(cx-90,cy-100,180,200,12,true,true);
+      ctx.save(); ctx.translate(cx,cy-30);
+      ctx.fillStyle=color; ctx.beginPath(); ctx.ellipse(0,0,20,12,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.ellipse(-8,-15,12,6,0,0,Math.PI*2); ctx.ellipse(8,-15,12,6,0,0,Math.PI*2); ctx.fill();
+      ctx.restore(); ctx.fillStyle='#fff'; ctx.font='20px sans-serif'; ctx.fillText(type==='levi'?'리바이 모기':'에렌 모기', cx, cy+70);
     }
 
-    // polyfill for ctx.roundRect for older browsers
-    if(!CanvasRenderingContext2D.prototype.roundRect){
-      CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
-        if(typeof r==='number') r={tl:r,tr:r,br:r,bl:r};
-        this.beginPath();
-        this.moveTo(x+r.tl,y);
-        this.lineTo(x+w-r.tr,y);
-        this.quadraticCurveTo(x+w,y,x+w,y+r.tr);
-        this.lineTo(x+w,y+h-r.br);
-        this.quadraticCurveTo(x+w,y+h,x+w-r.br,y+h);
-        this.lineTo(x+r.bl,y+h);
-        this.quadraticCurveTo(x,y+h,x,y+h-r.bl);
-        this.lineTo(x,y+r.tl);
-        this.quadraticCurveTo(x,y,x+r.tl,y);
-      };
+    // roundRect helper (safari polyfill)
+    function roundRect(x,y,w,h,r,fill,stroke){
+      if(ctx.roundRect){ctx.roundRect(x,y,w,h,r);if(fill)ctx.fill();if(stroke)ctx.stroke();return;}
+      if(typeof r==='number') r={tl:r,tr:r,br:r,bl:r}; ctx.beginPath(); ctx.moveTo(x+r.tl,y);
+      ctx.lineTo(x+w-r.tr,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r.tr);
+      ctx.lineTo(x+w,y+h-r.br); ctx.quadraticCurveTo(x+w,y+h,x+w-r.br,y+h);
+      ctx.lineTo(x+r.bl,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r.bl);
+      ctx.lineTo(x,y+r.tl); ctx.quadraticCurveTo(x,y,x+r.tl,y);
+      if(fill)ctx.fill(); if(stroke)ctx.stroke();
     }
 
     function drawGameOver(){
-      ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.textAlign='center';
-      ctx.fillStyle='#fff';
-      ctx.font='48px sans-serif'; ctx.fillText('Game Over', canvas.width/2, canvas.height/2 - 40);
+      ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.textAlign='center'; ctx.fillStyle='#fff'; ctx.font='48px sans-serif';
+      ctx.fillText('Game Over', canvas.width/2, canvas.height/2 - 40);
       ctx.font='24px sans-serif'; ctx.fillText('점수: '+score, canvas.width/2, canvas.height/2);
-      ctx.fillText('다시 시작하려면 R 키', canvas.width/2, canvas.height/2 + 40);
+      ctx.fillText('다시 시작하려면 R', canvas.width/2, canvas.height/2 + 40);
     }
 
-    // ---------- GAME LOOP ----------
+    // ───────── MAIN LOOP ─────────
     function loop(){
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      if(gameState==='menu') drawMenu();
+      if(gameState==='menu')      drawMenu();
       else if(gameState==='play'){ updatePlay(); drawPlay(); }
       else if(gameState==='over'){ drawPlay(); drawGameOver(); }
       requestAnimationFrame(loop);
     }
 
-    document.addEventListener('keydown', e=>{ if(e.key==='r'&&gameState==='over') {gameState='menu'; scoreUI.hidden=true;} });
-
+    document.addEventListener('keydown', e=>{ if(e.key==='r' && gameState==='over'){ gameState='menu'; $score.hidden=true; } });
     loop();
   </script>
 </body>
