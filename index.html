@@ -12,7 +12,7 @@
 <body>
   <div id="ui">
     <select id="charSelect">
-      <option value="levi">레바이 모기</option>
+      <option value="levi">리바이 모기</option>
       <option value="eren">에렌 모기</option>
     </select>
     <button id="startBtn">게임 시작</button>
@@ -34,36 +34,68 @@
 
     // 전역으로 키 상태 관리
     const keys = {};
-    window.addEventListener('keydown', e => { keys[e.key] = true; });
-    window.addEventListener('keyup',   e => { keys[e.key] = false; });
+    window.addEventListener('keydown', e => {
+        // Use e.key directly for arrow keys
+        keys[e.key] = true;
+    });
+    window.addEventListener('keyup', e => {
+        // Use e.key directly for arrow keys
+        keys[e.key] = false;
+    });
 
     let player, attacks, score, running;
 
     class Player {
       constructor(x,y, color) {
         this.x = x; this.y = y;
-        this.size = 20;
+        this.size = 20; // Radius for the head, body length will be based on this
         this.color = color;
         this.speed = 4;
       }
       update() {
-        if (keys['ArrowUp']   ) this.y -= this.speed;
-        if (keys['ArrowDown'] ) this.y += this.speed;
-        if (keys['ArrowLeft'] ) this.x -= this.speed;
+        // Corrected key names
+        if (keys['ArrowUp'])    this.y -= this.speed;
+        if (keys['ArrowDown'])  this.y += this.speed;
+        if (keys['ArrowLeft'])  this.x -= this.speed;
         if (keys['ArrowRight']) this.x += this.speed;
+
         this.x = Math.max(this.size, Math.min(W - this.size, this.x));
-        this.y = Math.max(this.size, Math.min(H - this.size, this.y));
+        this.y = Math.max(this.size * 1.5, Math.min(H - this.size * 0.5, this.y)); // Adjust bounds for stick figure
       }
       draw() {
-        ctx.fillStyle = this.color;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 3;
+
+        // Head
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
-        ctx.fill();
-        ctx.fillStyle = '#000';
+        ctx.arc(this.x, this.y - this.size * 0.5, this.size * 0.5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Body
         ctx.beginPath();
-        ctx.arc(this.x - 5, this.y - 5, 4, 0, Math.PI*2);
-        ctx.arc(this.x + 5, this.y - 5, 4, 0, Math.PI*2);
-        ctx.fill();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x, this.y + this.size);
+        ctx.stroke();
+
+        // Arms
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y + this.size * 0.2);
+        ctx.lineTo(this.x - this.size * 0.7, this.y + this.size * 0.7);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y + this.size * 0.2);
+        ctx.lineTo(this.x + this.size * 0.7, this.y + this.size * 0.7);
+        ctx.stroke();
+
+        // Legs
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y + this.size);
+        ctx.lineTo(this.x - this.size * 0.5, this.y + this.size * 1.5);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y + this.size);
+        ctx.lineTo(this.x + this.size * 0.5, this.y + this.size * 1.5);
+        ctx.stroke();
       }
     }
 
@@ -71,8 +103,8 @@
       constructor() { this.reset(); }
       reset() {
         const edge = Math.random() * 4 | 0;
-        if (edge === 0) { this.x = 0;       this.y = Math.random()*H; }
-        if (edge === 1) { this.x = W;       this.y = Math.random()*H; }
+        if (edge === 0) { this.x = 0;        this.y = Math.random()*H; }
+        if (edge === 1) { this.x = W;        this.y = Math.random()*H; }
         if (edge === 2) { this.x = Math.random()*W; this.y = 0; }
         if (edge === 3) { this.x = Math.random()*W; this.y = H; }
         this.size  = 40 + Math.random()*20;
@@ -100,6 +132,7 @@
         ctx.fill();
       }
       hits(p) {
+        // Simple circle collision for now, adjust if stick figure collision needs to be more precise
         return Math.hypot(this.x - p.x, this.y - p.y) < this.size + p.size;
       }
     }
