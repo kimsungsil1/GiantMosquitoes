@@ -4,7 +4,10 @@
   <meta charset="UTF-8" />
   <title>진격의 인간 (나는 모기)</title>
   <style>
-    body { margin:0; overflow:hidden; background:#222; color:#fff; font-family:sans-serif; cursor: none; } /* 마우스 커서 숨기기 */
+    body { margin:0; overflow:hidden; background:#222; color:#fff; font-family:sans-serif; }
+    /* 기본적으로 마우스 커서를 보이게 하고, 게임 시작 시에만 숨깁니다. */
+    .hide-cursor { cursor: none; } 
+
     #ui { position:absolute; top:10px; left:10px; z-index:10; }
     #ui select, #ui button { font-size:16px; margin-right:10px; }
   </style>
@@ -32,11 +35,9 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // 마우스 좌표를 저장할 변수
     let mouseX = W / 2;
     let mouseY = H / 2;
 
-    // 마우스 이동 이벤트 리스너 추가
     window.addEventListener('mousemove', e => {
       mouseX = e.clientX;
       mouseY = e.clientY;
@@ -44,67 +45,59 @@
 
     let player, enemies, score, running;
 
-    // 플레이어 (이제 모기입니다!)
     class Player {
       constructor(x,y, color) {
         this.x = x; this.y = y;
-        this.width = 15; // 모기 몸통 너비
-        this.height = 30; // 모기 몸통 높이
+        this.width = 15;
+        this.height = 30;
         this.color = color;
-        this.speed = 5; // 모기 속도 (마우스 따라다닐 때는 크게 의미 없음)
       }
       update() {
-        // 마우스 위치로 직접 이동
         this.x = mouseX;
         this.y = mouseY;
 
-        // 화면 밖으로 나가지 않도록 제한 (마우스 위치 제한)
         this.x = Math.max(this.width / 2, Math.min(W - this.width / 2, this.x));
         this.y = Math.max(this.height / 2, Math.min(H - this.height / 2, this.y));
       }
       draw() {
         ctx.fillStyle = this.color;
-        // 모기 몸통 (타원형)
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y, this.width / 2, this.height / 2, Math.PI / 4, 0, Math.PI * 2); // 비스듬한 타원
+        ctx.ellipse(this.x, this.y, this.width / 2, this.height / 2, Math.PI / 4, 0, Math.PI * 2);
         ctx.fill();
 
-        // 모기 머리 (작은 원)
         ctx.beginPath();
-        ctx.arc(this.x + Math.cos(Math.PI / 4) * (this.height / 2 - 5),
-                this.y + Math.sin(Math.PI / 4) * (this.height / 2 - 5),
+        ctx.arc(this.x + Math.cos(Math.PI / 4) * (this.height / 2 - 5), 
+                this.y + Math.sin(Math.PI / 4) * (this.height / 2 - 5), 
                 5, 0, Math.PI * 2);
         ctx.fill();
 
-        // 다리/날개 (간단한 선)
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x - 10, this.y - 20); // 왼쪽 날개
+        ctx.lineTo(this.x - 10, this.y - 20);
         ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x + 10, this.y - 20); // 오른쪽 날개
+        ctx.lineTo(this.x + 10, this.y - 20);
         ctx.stroke();
       }
     }
 
-    // 적 (이제 인간입니다!)
-    class Enemy {
+    // 적 (이제 인간입니다! 막대인간 모양)
+    class Enemy { 
       constructor() { this.reset(); }
       reset() {
-        const edge = Math.random() * 4 | 0; // 0:왼쪽, 1:오른쪽, 2:위, 3:아래
+        const edge = Math.random() * 4 | 0;
         if (edge === 0) { this.x = -50;       this.y = Math.random()*H; }
         if (edge === 1) { this.x = W + 50;    this.y = Math.random()*H; }
         if (edge === 2) { this.x = Math.random()*W; this.y = -50; }
         if (edge === 3) { this.x = Math.random()*W; this.y = H + 50; }
 
-        this.size  = 25 + Math.random()*15; // 인간 크기 조정
-        this.speed = 1.5 + Math.random()*1.5; // 인간 속도 조정 (모기보다 느리게)
+        this.size  = 25; // 인간의 머리 반지름을 위한 크기
+        this.speed = 1.5 + Math.random()*1.5;
         this.vx = this.vy = 0;
       }
       update() {
         if (!this.vx && !this.vy) {
-          // 플레이어(모기)를 향해 이동하도록 목표 설정
           const dx = player.x - this.x;
           const dy = player.y - this.y;
           const d = Math.hypot(dx, dy);
@@ -114,41 +107,80 @@
         this.x += this.vx;
         this.y += this.vy;
 
-        // 화면 밖으로 완전히 나가면 리셋 (무한 생성)
         if (this.x < -100 || this.x > W+100 || this.y < -100 || this.y > H+100) {
           this.reset();
         }
       }
       draw() {
-        ctx.fillStyle = 'rgba(200,0,0,0.7)'; // 인간은 빨간색
+        ctx.strokeStyle = 'rgba(200,0,0,0.7)'; // 인간은 빨간색
+        ctx.lineWidth = 3;
+
+        // 머리
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
-        ctx.fill();
+        ctx.arc(this.x, this.y - this.size * 0.5, this.size * 0.5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 몸통
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x, this.y + this.size);
+        ctx.stroke();
+
+        // 팔
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y + this.size * 0.2);
+        ctx.lineTo(this.x - this.size * 0.7, this.y + this.size * 0.7);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y + this.size * 0.2);
+        ctx.lineTo(this.x + this.size * 0.7, this.y + this.size * 0.7);
+        ctx.stroke();
+
+        // 다리
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y + this.size);
+        ctx.lineTo(this.x - this.size * 0.5, this.y + this.size * 1.5);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y + this.size);
+        ctx.lineTo(this.x + this.size * 0.5, this.y + this.size * 1.5);
+        ctx.stroke();
       }
-      // 충돌 감지 (인간이 모기를 잡았을 때)
+      // 충돌 감지 (모기와 인간 캐릭터 크기 고려)
       hits(p) {
-        // 인간(원)과 모기(타원)의 충돌을 간략화하여 처리 (모기 중심점과 인간 중심점 간의 거리)
-        return Math.hypot(this.x - p.x, this.y - p.y) < this.size + p.width/2; // 대략적인 충돌 범위
+        // 인간(막대인간 중심)과 모기(타원 중심)의 거리 계산
+        const dx = this.x - p.x;
+        const dy = (this.y + this.size * 0.75) - p.y; // 인간 몸통 중앙 정도로 조정
+        const distance = Math.hypot(dx, dy);
+        
+        // 인간의 대략적인 반경 (머리 + 몸통 일부)과 모기의 대략적인 반경(너비/2)을 더함
+        return distance < (this.size * 1.2) + (p.width / 2); 
       }
     }
 
     function initGame() {
+      // 게임 시작 시 마우스 커서 숨김
+      document.body.classList.add('hide-cursor');
+
       enemies = Array.from({length:3}, () => new Enemy());
       score   = 0;
       running = true;
       const choice = document.getElementById('charSelect').value;
-      const color  = (choice === 'levi' ? '#a0f' : '#0fa'); // 리바이: 보라색 모기, 에렌: 초록색 모기
-      player = new Player(W/2, H/2, color); // 플레이어는 이제 모기
+      const color  = (choice === 'levi' ? '#a0f' : '#0fa');
+      player = new Player(W/2, H/2, color);
       document.getElementById('score').textContent = '점수: 0';
       requestAnimationFrame(loop);
     }
 
     function loop() {
-      if (!running) return;
+      if (!running) {
+        // 게임 종료 시 마우스 커서 다시 보이게 함
+        document.body.classList.remove('hide-cursor');
+        return;
+      }
       player.update();
       enemies.forEach(a => a.update());
 
-      // 인간에게 잡혔는지 확인
       if (enemies.some(a => a.hits(player))) {
         running = false;
         alert('인간에게 잡혔다! 최종 생존 시간: ' + score + '초');
