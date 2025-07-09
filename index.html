@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>진격의 인간 (나는 모기)</title>
   <style>
-    body { margin:0; overflow:hidden; background:#222; color:#fff; font-family:sans-serif; }
+    body { margin:0; overflow:hidden; background:#222; color:#fff; font-family:sans-serif; cursor: none; } /* 마우스 커서 숨기기 */
     #ui { position:absolute; top:10px; left:10px; z-index:10; }
     #ui select, #ui button { font-size:16px; margin-right:10px; }
   </style>
@@ -32,12 +32,17 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // 전역으로 키 상태 관리
-    const keys = {};
-    window.addEventListener('keydown', e => { keys[e.key] = true; });
-    window.addEventListener('keyup',   e => { keys[e.key] = false; });
+    // 마우스 좌표를 저장할 변수
+    let mouseX = W / 2;
+    let mouseY = H / 2;
 
-    let player, enemies, score, running; // attacks -> enemies로 이름 변경
+    // 마우스 이동 이벤트 리스너 추가
+    window.addEventListener('mousemove', e => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+
+    let player, enemies, score, running;
 
     // 플레이어 (이제 모기입니다!)
     class Player {
@@ -46,15 +51,14 @@
         this.width = 15; // 모기 몸통 너비
         this.height = 30; // 모기 몸통 높이
         this.color = color;
-        this.speed = 5; // 모기가 인간보다 좀 더 빠르도록 조정
+        this.speed = 5; // 모기 속도 (마우스 따라다닐 때는 크게 의미 없음)
       }
       update() {
-        if (keys['ArrowUp']   ) this.y -= this.speed;
-        if (keys['ArrowDown'] ) this.y += this.speed;
-        if (keys['ArrowLeft'] ) this.x -= this.speed;
-        if (keys['ArrowRight']) this.x += this.speed;
+        // 마우스 위치로 직접 이동
+        this.x = mouseX;
+        this.y = mouseY;
 
-        // 화면 밖으로 나가지 않도록 제한
+        // 화면 밖으로 나가지 않도록 제한 (마우스 위치 제한)
         this.x = Math.max(this.width / 2, Math.min(W - this.width / 2, this.x));
         this.y = Math.max(this.height / 2, Math.min(H - this.height / 2, this.y));
       }
@@ -67,8 +71,8 @@
 
         // 모기 머리 (작은 원)
         ctx.beginPath();
-        ctx.arc(this.x + Math.cos(Math.PI / 4) * (this.height / 2 - 5), 
-                this.y + Math.sin(Math.PI / 4) * (this.height / 2 - 5), 
+        ctx.arc(this.x + Math.cos(Math.PI / 4) * (this.height / 2 - 5),
+                this.y + Math.sin(Math.PI / 4) * (this.height / 2 - 5),
                 5, 0, Math.PI * 2);
         ctx.fill();
 
@@ -85,7 +89,7 @@
     }
 
     // 적 (이제 인간입니다!)
-    class Enemy { // Attack -> Enemy로 이름 변경
+    class Enemy {
       constructor() { this.reset(); }
       reset() {
         const edge = Math.random() * 4 | 0; // 0:왼쪽, 1:오른쪽, 2:위, 3:아래
@@ -129,12 +133,10 @@
     }
 
     function initGame() {
-      // 적 (인간) 생성 개수 유지
       enemies = Array.from({length:3}, () => new Enemy());
       score   = 0;
       running = true;
       const choice = document.getElementById('charSelect').value;
-      // 모기 색상 선택
       const color  = (choice === 'levi' ? '#a0f' : '#0fa'); // 리바이: 보라색 모기, 에렌: 초록색 모기
       player = new Player(W/2, H/2, color); // 플레이어는 이제 모기
       document.getElementById('score').textContent = '점수: 0';
@@ -144,19 +146,19 @@
     function loop() {
       if (!running) return;
       player.update();
-      enemies.forEach(a => a.update()); // enemies로 변경
-      
+      enemies.forEach(a => a.update());
+
       // 인간에게 잡혔는지 확인
       if (enemies.some(a => a.hits(player))) {
         running = false;
-        alert('인간에게 잡혔다! 최종 생존 시간: ' + score + '초'); // 메시지 변경
+        alert('인간에게 잡혔다! 최종 생존 시간: ' + score + '초');
         return;
       }
       ctx.clearRect(0,0,W,H);
       player.draw();
-      enemies.forEach(a => a.draw()); // enemies로 변경
+      enemies.forEach(a => a.draw());
 
-      score++; // 점수는 생존 시간 (프레임 수)
+      score++;
       document.getElementById('score').textContent = '점수: ' + score;
       requestAnimationFrame(loop);
     }
