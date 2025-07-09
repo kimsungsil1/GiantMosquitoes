@@ -4,222 +4,246 @@
   <meta charset="UTF-8" />
   <title>진격의 모기 (Attack on Mosquito)</title>
   <style>
+    * {box-sizing: border-box;}
     body {
       margin: 0;
       overflow: hidden;
-      background: #222;
+      background: #111;
+      color: #fff;
+      font-family: 'Pretendard', sans-serif;
     }
     #score {
       position: absolute;
-      top: 10px;
-      left: 10px;
-      color: #fff;
+      top: 12px;
+      left: 12px;
       font-size: 24px;
-      font-family: sans-serif;
       user-select: none;
     }
   </style>
 </head>
 <body>
-  <canvas id="game" width="800" height="600"></canvas>
-  <div id="score">Score: 0</div>
+  <canvas id="game" width="960" height="640"></canvas>
+  <div id="score" hidden>Score&nbsp;0</div>
 
   <script>
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
+    const canvas   = document.getElementById('game');
+    const ctx      = canvas.getContext('2d');
+    const scoreUI  = document.getElementById('score');
 
-    // ------------------ Input ------------------
+    // ---------- GLOBAL STATE ----------
+    let gameState  = 'menu';   // 'menu' | 'play' | 'over'
+    let chosenType = null;     // 'levi' | 'eren'
+    let score      = 0;
+
+    // ---------- INPUT ----------
     const keys = {};
-    document.addEventListener("keydown", (e) => (keys[e.key] = true));
-    document.addEventListener("keyup", (e) => (keys[e.key] = false));
+    document.addEventListener('keydown', e => keys[e.key] = true);
+    document.addEventListener('keyup',   e => keys[e.key] = false);
 
-    // ------------------ Entities ------------------
-    class Mosquito {
-      constructor() {
-        this.x = 400;
-        this.y = 300;
-        this.size = 16;
-        this.speed = 3;
+    // ---------- CLICK (for menu) ----------
+    canvas.addEventListener('mousedown', handleMenuClick);
+    function handleMenuClick(e){
+      if (gameState !== 'menu') return;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      if (mx>190 && mx<370 && my>260 && my<460) startGame('levi');
+      if (mx>590 && mx<770 && my>260 && my<460) startGame('eren');
+    }
+
+    // ---------- UTILS ----------
+    function rand(min,max){return Math.random()*(max-min)+min;}
+    function rectIntersect(a,b){return (a.x<a.x+b.w && a.x+a.w>b.x && a.y<a.y+b.h && a.y+a.h>b.y);} // not used
+
+    // ---------- ENTITIES ----------
+    class Mosquito{
+      constructor(type){
+        this.type   = type;
+        this.size   = type==='levi'?14:18;
+        this.speed  = type==='levi'?4:3;
+        this.x      = canvas.width/2 - this.size/2;
+        this.y      = canvas.height/2 - this.size/2;
       }
-      update() {
-        if (keys["ArrowUp"] || keys["w"]) this.y -= this.speed;
-        if (keys["ArrowDown"] || keys["s"]) this.y += this.speed;
-        if (keys["ArrowLeft"] || keys["a"]) this.x -= this.speed;
-        if (keys["ArrowRight"] || keys["d"]) this.x += this.speed;
-
-        // Boundaries
+      update(){
+        if(keys['ArrowUp']||keys['w'])   this.y -= this.speed;
+        if(keys['ArrowDown']||keys['s']) this.y += this.speed;
+        if(keys['ArrowLeft']||keys['a']) this.x -= this.speed;
+        if(keys['ArrowRight']||keys['d'])this.x += this.speed;
+        // boundaries
         this.x = Math.max(0, Math.min(canvas.width - this.size, this.x));
         this.y = Math.max(0, Math.min(canvas.height - this.size, this.y));
       }
-      draw() {
-        // Body
-        ctx.fillStyle = "yellow";
+      draw(){
+        ctx.save();
+        // wings
+        ctx.translate(this.x+this.size/2, this.y+this.size/2);
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
         ctx.beginPath();
-        ctx.ellipse(
-          this.x + this.size / 2,
-          this.y + this.size / 2,
-          this.size / 2,
-          this.size / 4,
-          0,
-          0,
-          Math.PI * 2
-        );
+        ctx.ellipse(-4,-6,this.size/3,this.size/6,0,0,Math.PI*2);
+        ctx.ellipse( 4,-6,this.size/3,this.size/6,0,0,Math.PI*2);
         ctx.fill();
-
-        // Wings
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        // body different color per type
+        ctx.fillStyle = this.type==='levi' ? '#ffee00' : '#ff9900';
         ctx.beginPath();
-        ctx.ellipse(
-          this.x + this.size / 2 - 4,
-          this.y + 4,
-          this.size / 4,
-          this.size / 8,
-          0,
-          0,
-          Math.PI * 2
-        );
-        ctx.ellipse(
-          this.x + this.size / 2 + 4,
-          this.y + 4,
-          this.size / 4,
-          this.size / 8,
-          0,
-          0,
-          Math.PI * 2
-        );
+        ctx.ellipse(0,0,this.size/2,this.size/3,0,0,Math.PI*2);
         ctx.fill();
+        ctx.restore();
       }
-      get rect() {
-        return { x: this.x, y: this.y, w: this.size, h: this.size };
-      }
+      get rect(){return {x:this.x,y:this.y,w:this.size,h:this.size};}
     }
 
-    class Human {
-      constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.width = 40;
-        this.height = 80;
-        this.cooldown = 0;
+    class Human{
+      constructor(x,y){
+        this.baseW=40; this.baseH=80;
+        this.x=x; this.y=y;
+        this.cool=rand(60,180);
       }
-      update() {
-        if (this.cooldown > 0) this.cooldown--;
-        else if (Math.random() < 0.01) {
-          // Attempt a swat
-          swats.push(new Swat(this));
-          this.cooldown = 120 + Math.random() * 60;
-        }
+      update(){
+        if(this.cool>0) this.cool--; else {swats.push(new Swat(this)); this.cool=rand(120,240);}    
       }
-      draw() {
-        ctx.fillStyle = "#8d5524"; // Simple placeholder color for human
-        ctx.fillRect(this.x, this.y, this.width, this.height);
-      }
-      get rect() {
-        return { x: this.x, y: this.y, w: this.width, h: this.height };
-      }
-    }
-
-    class Swat {
-      constructor(human) {
-        this.x = human.x + human.width / 2;
-        this.y = human.y;
-        this.radius = 0;
-        this.maxRadius = 60;
-        this.alive = true;
-      }
-      update() {
-        this.radius += 6;
-        if (this.radius > this.maxRadius) this.alive = false;
-      }
-      draw() {
-        ctx.strokeStyle = "red";
+      draw(){
+        const scale = 0.6 + (this.y / canvas.height) * 0.4;
+        const w = this.baseW*scale;
+        const h = this.baseH*scale;
+        ctx.save();
+        ctx.translate(this.x+w/2,this.y+h/2);
+        ctx.scale(scale,scale);
+        ctx.translate(-this.baseW/2,-this.baseH/2);
+        // body gradient
+        const grad=ctx.createLinearGradient(0,0,0,this.baseH);
+        grad.addColorStop(0,'#d2b48c');
+        grad.addColorStop(1,'#8b5a2b');
+        ctx.fillStyle=grad;
+        ctx.fillRect(0,0,this.baseW,this.baseH);
+        // head
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.arc(this.baseW/2,-this.baseW/4,this.baseW/3,0,Math.PI*2);
+        ctx.fillStyle='#f1c27d'; ctx.fill();
+        ctx.restore();
       }
-      get rect() {
-        return {
-          x: this.x - this.radius,
-          y: this.y - this.radius,
-          w: this.radius * 2,
-          h: this.radius * 2,
-        };
-      }
+      get rect(){return {x:this.x,y:this.y,w:this.baseW*(0.6 + (this.y / canvas.height) * 0.4),h:this.baseH*(0.6 + (this.y / canvas.height) * 0.4)}}
     }
 
-    // ------------------ Utils ------------------
-    function rectIntersect(a, b) {
-      return (
-        a.x < b.x + b.w &&
-        a.x + a.w > b.x &&
-        a.y < b.y + b.h &&
-        a.y + a.h > b.y
-      );
+    class Swat{
+      constructor(h){
+        this.x=h.x+h.baseW/2;
+        this.y=h.y+10; // start near head
+        this.r=0; this.maxR=70; this.alive=true;
+      }
+      update(){this.r+=6; if(this.r>this.maxR) this.alive=false;}
+      draw(){ctx.strokeStyle='red'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2); ctx.stroke();}
+      get rect(){return {x:this.x-this.r,y:this.y-this.r,w:this.r*2,h:this.r*2}}
     }
 
-    // ------------------ Game Setup ------------------
-    const player = new Mosquito();
-    const humans = [
-      new Human(150, 200),
-      new Human(350, 100),
-      new Human(600, 250),
-    ];
-    let swats = [];
-    let score = 0;
-    let gameOver = false;
+    // ---------- GAME OBJECTS ----------
+    let player;
+    const humans=[];
+    let swats=[];
 
-    // ------------------ Main Loop ------------------
-    function loop() {
-      if (gameOver) {
-        drawGameOver();
-        return;
-      }
+    function initHumans(){
+      humans.length=0;
+      for(let i=0;i<5;i++) humans.push(new Human(rand(80,canvas.width-80), rand(50, canvas.height-150)));
+    }
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function startGame(type){
+      chosenType=type;
+      player=new Mosquito(type);
+      initHumans();
+      swats=[];
+      score=0;
+      scoreUI.textContent='Score 0';
+      scoreUI.hidden=false;
+      gameState='play';
+    }
 
+    function updatePlay(){
       player.update();
+      humans.forEach(h=>{h.update(); if(rectIntersect(player.rect,h.rect)){score++; scoreUI.textContent='Score '+score;}});
+      swats=swats.filter(s=>s.alive);
+      swats.forEach(s=>{s.update(); if(rectIntersect(player.rect,s.rect)){gameState='over';}});
+    }
+
+    function drawPlay(){
+      // clear & simple ground gradient for depth
+      const bg=ctx.createLinearGradient(0,0,0,canvas.height);
+      bg.addColorStop(0,'#003'); bg.addColorStop(1,'#040');
+      ctx.fillStyle=bg; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+      humans.forEach(h=>h.draw());
       player.draw();
+      swats.forEach(s=>s.draw());
+    }
 
-      humans.forEach((h) => {
-        h.update();
-        h.draw();
+    // ---------- MENU ----------
+    function drawMenu(){
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.textAlign='center';
+      ctx.font='48px sans-serif';
+      ctx.fillStyle='#fff';
+      ctx.fillText('진격의 모기', canvas.width/2, 120);
+      ctx.font='24px sans-serif';
+      ctx.fillText('캐릭터를 선택하세요', canvas.width/2, 180);
 
-        // Bite detection
-        if (rectIntersect(player.rect, h.rect)) {
-          score += 1;
-          document.getElementById("score").textContent = "Score: " + score;
-        }
-      });
+      // Levi card
+      drawCard(280,260,'levi','#ffee00');
+      // Eren card
+      drawCard(680,260,'eren','#ff9900');
+    }
 
-      // Swats
-      swats = swats.filter((s) => s.alive);
-      swats.forEach((s) => {
-        s.update();
-        s.draw();
-        if (rectIntersect(player.rect, s.rect)) {
-          gameOver = true;
-        }
-      });
+    function drawCard(cx,cy,type,color){
+      ctx.fillStyle='#222'; ctx.strokeStyle='#555'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.roundRect(cx-90,cy-100,180,200,12); ctx.fill(); ctx.stroke();
+      // mosquito icon
+      ctx.save();
+      ctx.translate(cx,cy-30);
+      ctx.fillStyle=color;
+      ctx.beginPath(); ctx.ellipse(0,0,20,12,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.7)';
+      ctx.beginPath(); ctx.ellipse(-8,-15,12,6,0,0,Math.PI*2); ctx.ellipse(8,-15,12,6,0,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+      // label
+      ctx.fillStyle='#fff'; ctx.font='20px sans-serif';
+      ctx.fillText(type==='levi'?'리바이 모기':'에렌 모기', cx, cy+70);
+    }
 
+    // polyfill for ctx.roundRect for older browsers
+    if(!CanvasRenderingContext2D.prototype.roundRect){
+      CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+        if(typeof r==='number') r={tl:r,tr:r,br:r,bl:r};
+        this.beginPath();
+        this.moveTo(x+r.tl,y);
+        this.lineTo(x+w-r.tr,y);
+        this.quadraticCurveTo(x+w,y,x+w,y+r.tr);
+        this.lineTo(x+w,y+h-r.br);
+        this.quadraticCurveTo(x+w,y+h,x+w-r.br,y+h);
+        this.lineTo(x+r.bl,y+h);
+        this.quadraticCurveTo(x,y+h,x,y+h-r.bl);
+        this.lineTo(x,y+r.tl);
+        this.quadraticCurveTo(x,y,x+r.tl,y);
+      };
+    }
+
+    function drawGameOver(){
+      ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.textAlign='center';
+      ctx.fillStyle='#fff';
+      ctx.font='48px sans-serif'; ctx.fillText('Game Over', canvas.width/2, canvas.height/2 - 40);
+      ctx.font='24px sans-serif'; ctx.fillText('점수: '+score, canvas.width/2, canvas.height/2);
+      ctx.fillText('다시 시작하려면 R 키', canvas.width/2, canvas.height/2 + 40);
+    }
+
+    // ---------- GAME LOOP ----------
+    function loop(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if(gameState==='menu') drawMenu();
+      else if(gameState==='play'){ updatePlay(); drawPlay(); }
+      else if(gameState==='over'){ drawPlay(); drawGameOver(); }
       requestAnimationFrame(loop);
     }
 
-    function drawGameOver() {
-      ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#fff";
-      ctx.font = "48px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2);
-      ctx.font = "24px sans-serif";
-      ctx.fillText(
-        "Refresh the page to play again",
-        canvas.width / 2,
-        canvas.height / 2 + 40
-      );
-    }
+    document.addEventListener('keydown', e=>{ if(e.key==='r'&&gameState==='over') {gameState='menu'; scoreUI.hidden=true;} });
 
-    // Start game
     loop();
   </script>
 </body>
