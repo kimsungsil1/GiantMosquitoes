@@ -2,182 +2,158 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>진격의 모기 ― Attack on Mosquito</title>
+  <title>진격의 모기</title>
   <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; overflow: hidden; background: #111; color: #fff; font-family: 'Pretendard', sans-serif; }
-    #score { position: absolute; top: 12px; left: 12px; font-size: 24px; user-select: none; }
-    canvas { cursor: crosshair; display: block; margin: 0 auto; }
+    body { margin:0; overflow:hidden; background:#222; color:#fff; font-family:sans-serif; }
+    #ui { position:absolute; top:10px; left:10px; z-index:10; }
+    #ui select, #ui button { font-size:16px; margin-right:10px; }
   </style>
 </head>
 <body>
-  <canvas id="game" width="960" height="640"></canvas>
-  <div id="score" hidden>Score 0</div>
+  <div id="ui">
+    <select id="charSelect">
+      <option value="levi">레바이 모기</option>
+      <option value="eren">에렌 모기</option>
+    </select>
+    <button id="startBtn">게임 시작</button>
+    <span id="score">점수: 0</span>
+  </div>
+  <canvas id="game"></canvas>
 
   <script>
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
-    const $score = document.getElementById('score');
+    let W, H;
+    function resize() {
+      W = canvas.width = innerWidth;
+      H = canvas.height = innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
 
-    // ───────── GLOBAL STATE ─────────
-    let gameState = 'menu';  // 'menu' | 'play' | 'over'
-    let score = 0;
-
-    // ───────── INPUT ─────────
+    // 키 상태
     const keys = {};
-    document.addEventListener('keydown', e => { keys[e.key] = true; });
-    document.addEventListener('keyup', e => { keys[e.key] = false; });
+    window.addEventListener('keydown', e => keys[e.key] = true);
+    window.addEventListener('keyup',   e => keys[e.key] = false);
 
-    // ───────── MENU CLICK ─────────
-    canvas.addEventListener('mousedown', e => {
-      if (gameState !== 'menu') return;
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      if (mx > 190 && mx < 370 && my > 160 && my < 360) startGame('levi');
-      if (mx > 590 && mx < 770 && my > 160 && my < 360) startGame('eren');
-    });
+    // 게임 변수
+    let player, attacks, score, running;
 
-    // ───────── UTILS ─────────
-    const rand = (min, max) => Math.random() * (max - min) + min;
-    const rectIntersect = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-
-    // ───────── ENTITIES ─────────
-    class Mosquito {
-      constructor(type) {
-        this.type = type;
-        this.size = type === 'levi' ? 14 : 18;
-        this.speed = type === 'levi' ? 4 : 3;
-        this.x = canvas.width / 2 - this.size / 2;
-        this.y = canvas.height / 2 - this.size / 2;
-        this.biteCooldown = 0;
-      }
-      update() {
-        if (keys['ArrowUp'] || keys['w']) this.y -= this.speed;
-        if (keys['ArrowDown'] || keys['s']) this.y += this.speed;
-        if (keys['ArrowLeft'] || keys['a']) this.x -= this.speed;
-        if (keys['ArrowRight'] || keys['d']) this.x += this.speed;
-        this.x = Math.max(0, Math.min(canvas.width - this.size, this.x));
-        this.y = Math.max(0, Math.min(canvas.height - this.size, this.y));
-        if (this.biteCooldown > 0) this.biteCooldown--;
-      }
-      draw() {
-        ctx.save();
-        ctx.translate(this.x + this.size / 2, this.y + this.size / 2);
-        // wings
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';
-        ctx.beginPath();
-        ctx.ellipse(-4, -6, this.size / 3, this.size / 6, 0, 0, Math.PI * 2);
-        ctx.ellipse(4, -6, this.size / 3, this.size / 6, 0, 0, Math.PI * 2);
-        ctx.fill();
-        // body
-        ctx.fillStyle = this.type === 'levi' ? '#ffee00' : '#ff9900';
-        ctx.beginPath();
-        ctx.ellipse(0, 0, this.size / 2, this.size / 3, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-      get rect() {
-        return { x: this.x, y: this.y, w: this.size, h: this.size, bottom: this.y + this.size };
-      }
-    }
-
-    class Human {
-      constructor(x, y) {
-        this.baseW = 40; this.baseH = 80;
+    class Player {
+      constructor(x,y, color) {
         this.x = x; this.y = y;
-        this.cool = rand(60, 180);
-        this.hp = 3;
+        this.size = 20;
+        this.color = color;
+        this.speed = 4;
       }
       update() {
-        if (this.cool > 0) this.cool--; else { swats.push(new Swat(this)); this.cool = rand(120, 240); }
+        if (keys['ArrowUp'] ) this.y -= this.speed;
+        if (keys['ArrowDown']) this.y += this.speed;
+        if (keys['ArrowLeft']) this.x -= this.speed;
+        if (keys['ArrowRight'])this.x += this.speed;
+        // 경계
+        this.x = Math.max(this.size, Math.min(W - this.size, this.x));
+        this.y = Math.max(this.size, Math.min(H - this.size, this.y));
       }
       draw() {
-        const scale = 0.6 + (this.y / canvas.height) * 0.4;
-        const w = this.baseW * scale, h = this.baseH * scale;
-        ctx.save();
-        ctx.translate(this.x + w / 2, this.y + h / 2);
-        ctx.scale(scale, scale);
-        ctx.translate(-this.baseW / 2, -this.baseH / 2);
-        // body gradient
-        const grad = ctx.createLinearGradient(0, 0, 0, this.baseH);
-        grad.addColorStop(0, '#d2b48c'); grad.addColorStop(1, '#8b5a2b');
-        ctx.fillStyle = grad; ctx.fillRect(0, 0, this.baseW, this.baseH);
-        // head
-        ctx.beginPath(); ctx.arc(this.baseW / 2, -this.baseW / 4, this.baseW / 3, 0, Math.PI * 2);
-        ctx.fillStyle = '#f1c27d'; ctx.fill();
-        ctx.restore();
-      }
-      get rect() {
-        const s = 0.6 + (this.y / canvas.height) * 0.4;
-        return { x: this.x, y: this.y, w: this.baseW * s, h: this.baseH * s, bottom: this.y + this.baseH * s };
-      }
-      get neckRect() {
-        const r = this.rect;
-        return { x: r.x + r.w * 0.25, y: r.y - r.w * 0.2, w: r.w * 0.5, h: r.h * 0.15 };
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+        ctx.fill();
+        // 눈
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(this.x - 5, this.y - 5, 4, 0, Math.PI*2);
+        ctx.arc(this.x + 5, this.y - 5, 4, 0, Math.PI*2);
+        ctx.fill();
       }
     }
 
-    class Swat {
-      constructor(h) {
-        this.x = h.x + h.baseW / 2;
-        this.y = h.y + 10;
-        this.r = 0; this.maxR = 70; this.alive = true;
+    class Attack {
+      constructor() {
+        this.reset();
       }
-      update() { this.r += 6; if (this.r > this.maxR) this.alive = false; }
-      draw() { ctx.strokeStyle = 'red'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); ctx.stroke(); }
-      get rect() { return { x: this.x - this.r, y: this.y - this.r, w: this.r * 2, h: this.r * 2, bottom: this.y + this.r }; }
-    }
-
-    // ───────── GAME FUNCTIONS ─────────
-    let player;
-    const humans = [], swats = [];
-    const spawnHuman = () => humans.push(new Human(rand(80, canvas.width - 120), rand(60, canvas.height - 180)));
-    function initHumans() { humans.length = 0; for (let i = 0; i < 6; i++) spawnHuman(); }
-
-    function startGame(type) {
-      player = new Mosquito(type);
-      initHumans(); swats.length = 0; score = 0;
-      $score.textContent = 'Score ' + score; $score.hidden = false;
-      gameState = 'play';
-    }
-
-    function updatePlay() {
-      player.update();
-      humans.forEach(h => {
-        h.update();
-        if (player.biteCooldown === 0 && rectIntersect(player.rect, h.neckRect)) {
-          h.hp--; score += 5; $score.textContent = 'Score ' + score; player.biteCooldown = 30;
-          if (h.hp <= 0) {
-            score += 10; $score.textContent = 'Score ' + score;
-            humans.splice(humans.indexOf(h), 1);
-            spawnHuman();
-          }
+      reset() {
+        // 거인의 스와이프 시작 위치(랜덤 가장자리)
+        const edge = Math.random() * 4 | 0;
+        if (edge === 0) { this.x = 0; this.y = Math.random()*H; }
+        if (edge === 1) { this.x = W; this.y = Math.random()*H; }
+        if (edge === 2) { this.x = Math.random()*W; this.y = 0; }
+        if (edge === 3) { this.x = Math.random()*W; this.y = H; }
+        this.size = 40 + Math.random()*20;
+        this.speed = 2 + Math.random()*2;
+        // 타겟은 플레이어 현재 위치
+        this.vx = 0; this.vy = 0;
+      }
+      update() {
+        // 플레이어 방향으로 속도 설정 (한 번만)
+        if (!this.vx && !this.vy) {
+          const dx = player.x - this.x;
+          const dy = player.y - this.y;
+          const d = Math.hypot(dx, dy);
+          this.vx = dx/d * this.speed;
+          this.vy = dy/d * this.speed;
         }
-      });
-      swats.filter(s => s.alive).forEach(s => { s.update(); if (rectIntersect(player.rect, s.rect)) gameState = 'over'; });
+        this.x += this.vx;
+        this.y += this.vy;
+        // 화면 벗어나면 재생성
+        if (this.x < -50 || this.x > W+50 || this.y < -50 || this.y > H+50) {
+          this.reset();
+        }
+      }
+      draw() {
+        ctx.fillStyle = 'rgba(200,0,0,0.7)';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+        ctx.fill();
+      }
+      hits(p) {
+        const dx = this.x - p.x;
+        const dy = this.y - p.y;
+        return Math.hypot(dx, dy) < this.size + p.size;
+      }
     }
 
-    function drawPlay() {
-      const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      bg.addColorStop(0, '#021'); bg.addColorStop(1, '#042');
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const entities = [...humans, player, ...swats].sort((a, b) => (a.bottom - b.bottom));
-      entities.forEach(e => e.draw());
+    function initGame() {
+      attacks = [];
+      for (let i=0; i<3; i++) attacks.push(new Attack());
+      score = 0;
+      running = true;
+      const choice = document.getElementById('charSelect').value;
+      const color = (choice === 'levi' ? '#0af' : '#fa0');
+      player = new Player(W/2, H/2, color);
+      document.getElementById('score').textContent = '점수: 0';
+      requestAnimationFrame(loop);
     }
 
-    function drawMenu() {
-      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '48px sans-serif';
-      ctx.fillText('진격의 모기', canvas.width / 2, 120);
-      ctx.font = '24px sans-serif'; ctx.fillText('캐릭터를 선택하세요', canvas.width / 2, 180);
-      drawCard(280, 260, 'levi', '#ffee00'); drawCard(680, 260, 'eren', '#ff9900');
+    function loop(timestamp) {
+      if (!running) return;
+      // 업데이트
+      player.update();
+      attacks.forEach(a => a.update());
+      // 충돌 체크
+      for (let a of attacks) {
+        if (a.hits(player)) {
+          running = false;
+          alert('당신은 물렸다! 최종 점수: ' + score);
+          return;
+        }
+      }
+      // 그리기
+      ctx.clearRect(0,0,W,H);
+      player.draw();
+      attacks.forEach(a => a.draw());
+      // 점수
+      score++;
+      document.getElementById('score').textContent = '점수: ' + score;
+
+      requestAnimationFrame(loop);
     }
-    function drawCard(cx, cy, type, color) {
-      ctx.fillStyle = '#222'; ctx.strokeStyle = '#555'; ctx.lineWidth = 3;
-      roundRect(cx - 90, cy - 100, 180, 200, 12, true, true);
-      ctx.save(); ctx.translate(cx, cy - 30);
-      ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(0, 0, 20, 12, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath();
-      ctx.ellipse(-8, -15, 12, 6, 0, 0, Math.PI * 2);
-      ctx.ellipse(8, -15, 12, 6, 0, 0, Math
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+      if (!running) initGame();
+      else if (!player) initGame();
+    });
+  </script>
+</body>
+</html>
