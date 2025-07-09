@@ -4,165 +4,180 @@
   <meta charset="UTF-8" />
   <title>진격의 모기 ― Attack on Mosquito</title>
   <style>
-    *{box-sizing:border-box}
-    body{margin:0;overflow:hidden;background:#111;color:#fff;font-family:'Pretendard',sans-serif}
-    #score{position:absolute;top:12px;left:12px;font-size:24px;user-select:none}
-    canvas{cursor:crosshair}
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #111; color: #fff; font-family: 'Pretendard', sans-serif; }
+    #score { position: absolute; top: 12px; left: 12px; font-size: 24px; user-select: none; }
+    canvas { cursor: crosshair; display: block; margin: 0 auto; }
   </style>
 </head>
 <body>
   <canvas id="game" width="960" height="640"></canvas>
-  <div id="score" hidden>Score&nbsp;0</div>
+  <div id="score" hidden>Score 0</div>
 
   <script>
-    const canvas=document.getElementById('game');
-    const ctx=canvas.getContext('2d');
-    const $score=document.getElementById('score');
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const $score = document.getElementById('score');
 
-    /* ───────── GLOBAL ───────── */
-    let gameState='menu'; // 'menu' | 'play' | 'over'
-    let score=0;
+    // ───────── GLOBAL STATE ─────────
+    let gameState = 'menu';  // 'menu' | 'play' | 'over'
+    let score = 0;
 
-    /* ───────── INPUT ───────── */
-    const keys={};
-    document.addEventListener('keydown',e=>keys[e.key]=true);
-    document.addEventListener('keyup',e=>keys[e.key]=false);
+    // ───────── INPUT ─────────
+    const keys = {};
+    document.addEventListener('keydown', e => { keys[e.key] = true; });
+    document.addEventListener('keyup', e => { keys[e.key] = false; });
 
-    /* ───────── MENU CLICK ───────── */
-    canvas.addEventListener('mousedown',e=>{
-      if(gameState!=='menu')return;
-      const r=canvas.getBoundingClientRect();
-      const mx=e.clientX-r.left,my=e.clientY-r.top;
-      if(mx>190&&mx<370&&my>160&&my<360) startGame('levi');
-      if(mx>590&&mx<770&&my>160&&my<360) startGame('eren');
+    // ───────── MENU CLICK ─────────
+    canvas.addEventListener('mousedown', e => {
+      if (gameState !== 'menu') return;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      if (mx > 190 && mx < 370 && my > 160 && my < 360) startGame('levi');
+      if (mx > 590 && mx < 770 && my > 160 && my < 360) startGame('eren');
     });
 
-    /* ───────── UTILS ───────── */
-    const rand=(min,max)=>Math.random()*(max-min)+min;
-    const rectIntersect=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+    // ───────── UTILS ─────────
+    const rand = (min, max) => Math.random() * (max - min) + min;
+    const rectIntersect = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
-    /* ───────── ENTITIES ───────── */
-    class Mosquito{
-      constructor(type){
-        this.type=type;
-        this.size=type==='levi'?14:18;
-        this.speed=type==='levi'?4:3;
-        this.x=canvas.width/2-this.size/2;
-        this.y=canvas.height/2-this.size/2;
-        this.biteCooldown=0;
+    // ───────── ENTITIES ─────────
+    class Mosquito {
+      constructor(type) {
+        this.type = type;
+        this.size = type === 'levi' ? 14 : 18;
+        this.speed = type === 'levi' ? 4 : 3;
+        this.x = canvas.width / 2 - this.size / 2;
+        this.y = canvas.height / 2 - this.size / 2;
+        this.biteCooldown = 0;
       }
-      update(){
-        if(keys['ArrowUp']||keys['w'])this.y-=this.speed;
-        if(keys['ArrowDown']||keys['s'])this.y+=this.speed;
-        if(keys['ArrowLeft']||keys['a'])this.x-=this.speed;
-        if(keys['ArrowRight']||keys['d'])this.x+=this.speed;
-        this.x=Math.max(0,Math.min(canvas.width-this.size,this.x));
-        this.y=Math.max(0,Math.min(canvas.height-this.size,this.y));
-        if(this.biteCooldown>0)this.biteCooldown--;
+      update() {
+        if (keys['ArrowUp'] || keys['w']) this.y -= this.speed;
+        if (keys['ArrowDown'] || keys['s']) this.y += this.speed;
+        if (keys['ArrowLeft'] || keys['a']) this.x -= this.speed;
+        if (keys['ArrowRight'] || keys['d']) this.x += this.speed;
+        this.x = Math.max(0, Math.min(canvas.width - this.size, this.x));
+        this.y = Math.max(0, Math.min(canvas.height - this.size, this.y));
+        if (this.biteCooldown > 0) this.biteCooldown--;
       }
-      draw(){
+      draw() {
         ctx.save();
-        ctx.translate(this.x+this.size/2,this.y+this.size/2);
-        ctx.fillStyle='rgba(255,255,255,0.7)';
+        ctx.translate(this.x + this.size / 2, this.y + this.size / 2);
+        // wings
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
         ctx.beginPath();
-        ctx.ellipse(-4,-6,this.size/3,this.size/6,0,0,Math.PI*2);
-        ctx.ellipse(4,-6,this.size/3,this.size/6,0,0,Math.PI*2);
+        ctx.ellipse(-4, -6, this.size / 3, this.size / 6, 0, 0, Math.PI * 2);
+        ctx.ellipse(4, -6, this.size / 3, this.size / 6, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle=this.type==='levi'?'#ffee00':'#ff9900';
+        // body
+        ctx.fillStyle = this.type === 'levi' ? '#ffee00' : '#ff9900';
         ctx.beginPath();
-        ctx.ellipse(0,0,this.size/2,this.size/3,0,0,Math.PI*2);
+        ctx.ellipse(0, 0, this.size / 2, this.size / 3, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
-      get rect(){return{x:this.x,y:this.y,w:this.size,h:this.size,bottom:this.y+this.size}};
+      get rect() {
+        return { x: this.x, y: this.y, w: this.size, h: this.size, bottom: this.y + this.size };
+      }
     }
 
-    class Human{
-      constructor(x,y){
-        this.baseW=40;this.baseH=80;
-        this.x=x;this.y=y;
-        this.cool=rand(60,180);
-        this.hp=3;
+    class Human {
+      constructor(x, y) {
+        this.baseW = 40; this.baseH = 80;
+        this.x = x; this.y = y;
+        this.cool = rand(60, 180);
+        this.hp = 3;
       }
-      update(){
-        if(this.cool>0)this.cool--;else{swats.push(new Swat(this));this.cool=rand(120,240);}  
+      update() {
+        if (this.cool > 0) this.cool--; else { swats.push(new Swat(this)); this.cool = rand(120, 240); }
       }
-      draw(){
-        const s=0.6+(this.y/canvas.height)*0.4;
-        const w=this.baseW*s,h=this.baseH*s;
+      draw() {
+        const scale = 0.6 + (this.y / canvas.height) * 0.4;
+        const w = this.baseW * scale, h = this.baseH * scale;
         ctx.save();
-        ctx.translate(this.x+w/2,this.y+h/2);
-        ctx.scale(s,s);
-        ctx.translate(-this.baseW/2,-this.baseH/2);
-        const g=ctx.createLinearGradient(0,0,0,this.baseH);
-        g.addColorStop(0,'#d2b48c');g.addColorStop(1,'#8b5a2b');
-        ctx.fillStyle=g;ctx.fillRect(0,0,this.baseW,this.baseH);
-        ctx.beginPath();ctx.arc(this.baseW/2,-this.baseW/4,this.baseW/3,0,Math.PI*2);
-        ctx.fillStyle='#f1c27d';ctx.fill();
+        ctx.translate(this.x + w / 2, this.y + h / 2);
+        ctx.scale(scale, scale);
+        ctx.translate(-this.baseW / 2, -this.baseH / 2);
+        // body gradient
+        const grad = ctx.createLinearGradient(0, 0, 0, this.baseH);
+        grad.addColorStop(0, '#d2b48c'); grad.addColorStop(1, '#8b5a2b');
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, this.baseW, this.baseH);
+        // head
+        ctx.beginPath(); ctx.arc(this.baseW / 2, -this.baseW / 4, this.baseW / 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#f1c27d'; ctx.fill();
         ctx.restore();
       }
-      get rect(){const s=0.6+(this.y/canvas.height)*0.4;return{x:this.x,y:this.y,w:this.baseW*s,h:this.baseH*s,bottom:this.y+this.baseH*s}};
-      get neckRect(){const r=this.rect;return{x:r.x+r.w*0.25,y:r.y-r.w*0.2,w:r.w*0.5,h:r.h*0.15}};
+      get rect() {
+        const s = 0.6 + (this.y / canvas.height) * 0.4;
+        return { x: this.x, y: this.y, w: this.baseW * s, h: this.baseH * s, bottom: this.y + this.baseH * s };
+      }
+      get neckRect() {
+        const r = this.rect;
+        return { x: r.x + r.w * 0.25, y: r.y - r.w * 0.2, w: r.w * 0.5, h: r.h * 0.15 };
+      }
     }
 
-    class Swat{
-      constructor(h){this.x=h.x+h.baseW/2;this.y=h.y+10;this.r=0;this.maxR=70;this.alive=true;}
-      update(){this.r+=6;if(this.r>this.maxR)this.alive=false;}
-      draw(){ctx.strokeStyle='red';ctx.lineWidth=2;ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.stroke();}
-      get rect(){return{x:this.x-this.r,y:this.y-this.r,w:this.r*2,h:this.r*2,bottom:this.y+this.r}};
+    class Swat {
+      constructor(h) {
+        this.x = h.x + h.baseW / 2;
+        this.y = h.y + 10;
+        this.r = 0; this.maxR = 70; this.alive = true;
+      }
+      update() { this.r += 6; if (this.r > this.maxR) this.alive = false; }
+      draw() { ctx.strokeStyle = 'red'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); ctx.stroke(); }
+      get rect() { return { x: this.x - this.r, y: this.y - this.r, w: this.r * 2, h: this.r * 2, bottom: this.y + this.r }; }
     }
 
-    /* ───────── GAME OBJECTS ───────── */
+    // ───────── GAME FUNCTIONS ─────────
     let player;
-    const humans=[];let swats=[];
-    const spawnHuman=()=>humans.push(new Human(rand(80,canvas.width-120),rand(60,canvas.height-180)));
-    const initHumans=()=>{humans.length=0;for(let i=0;i<6;i++)spawnHuman();};
+    const humans = [], swats = [];
+    const spawnHuman = () => humans.push(new Human(rand(80, canvas.width - 120), rand(60, canvas.height - 180)));
+    function initHumans() { humans.length = 0; for (let i = 0; i < 6; i++) spawnHuman(); }
 
-    function startGame(type){
-      player=new Mosquito(type);
-      initHumans();swats=[];score=0;
-      $score.textContent='Score '+score;$score.hidden=false;
-      gameState='play';
+    function startGame(type) {
+      player = new Mosquito(type);
+      initHumans(); swats.length = 0; score = 0;
+      $score.textContent = 'Score ' + score; $score.hidden = false;
+      gameState = 'play';
     }
 
-    function updatePlay(){
+    function updatePlay() {
       player.update();
-      humans.forEach(h=>{
+      humans.forEach(h => {
         h.update();
-        if(player.biteCooldown===0&&rectIntersect(player.rect,h.neckRect)){
-          h.hp--;score+=5;$score.textContent='Score '+score;player.biteCooldown=30;
-          if(h.hp<=0){score+=10;$score.textContent='Score '+score;humans.splice(humans.indexOf(h),1);spawnHuman();}
+        if (player.biteCooldown === 0 && rectIntersect(player.rect, h.neckRect)) {
+          h.hp--; score += 5; $score.textContent = 'Score ' + score; player.biteCooldown = 30;
+          if (h.hp <= 0) {
+            score += 10; $score.textContent = 'Score ' + score;
+            humans.splice(humans.indexOf(h), 1);
+            spawnHuman();
+          }
         }
       });
-      swats=swats.filter(s=>s.alive);
-      swats.forEach(s=>{s.update();if(rectIntersect(player.rect,s.rect))gameState='over';});
+      swats.filter(s => s.alive).forEach(s => { s.update(); if (rectIntersect(player.rect, s.rect)) gameState = 'over'; });
     }
 
-    function drawPlay(){
-      const bg=ctx.createLinearGradient(0,0,0,canvas.height);
-      bg.addColorStop(0,'#021');bg.addColorStop(1,'#042');ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);
-      const ents=[...humans,player,...swats].sort((a,b)=>(a.bottom||a.y)-(b.bottom||b.y));
-      ents.forEach(e=>e.draw());
+    function drawPlay() {
+      const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      bg.addColorStop(0, '#021'); bg.addColorStop(1, '#042');
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const entities = [...humans, player, ...swats].sort((a, b) => (a.bottom - b.bottom));
+      entities.forEach(e => e.draw());
     }
 
-    /* ───────── MENU ───────── */
-    function drawMenu(){
-      ctx.fillStyle='#000';ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='48px sans-serif';ctx.fillText('진격의 모기',canvas.width/2,120);
-      ctx.font='24px sans-serif';ctx.fillText('캐릭터를 선택하세요',canvas.width/2,180);
-      drawCard(280,260,'levi','#ffee00');drawCard(680,260,'eren','#ff9900');
+    function drawMenu() {
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '48px sans-serif';
+      ctx.fillText('진격의 모기', canvas.width / 2, 120);
+      ctx.font = '24px sans-serif'; ctx.fillText('캐릭터를 선택하세요', canvas.width / 2, 180);
+      drawCard(280, 260, 'levi', '#ffee00'); drawCard(680, 260, 'eren', '#ff9900');
     }
-    function drawCard(cx,cy,type,color){
-      ctx.fillStyle='#222';ctx.strokeStyle='#555';ctx.lineWidth=3;roundRect(cx-90,cy-100,180,200,12,true,true);
-      ctx.save();ctx.translate(cx,cy-30);
-      ctx.fillStyle=color;ctx.beginPath();ctx.ellipse(0,0,20,12,0,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='rgba(255,255,255,0.7)';ctx.beginPath();ctx.ellipse(-8,-15,12,6,0,0,Math.PI*2);ctx.ellipse(8,-15,12,6,0,0,Math.PI*2);ctx.fill();
-      ctx.restore();ctx.fillStyle='#fff';ctx.font='20px sans-serif';ctx.fillText(type==='levi'?'리바이 모기':'에렌 모기',cx,cy+70);
-    }
-
-    /* ───────── HELPERS ───────── */
-    function roundRect(x,y,w,h,r,fill,stroke){
-      if(ctx.roundRect){ctx.roundRect(x,y,w,h,r);if(fill)ctx.fill();if(stroke)ctx.stroke();return;}
-      if(typeof r==='number')r={tl:r,tr:r,br:r,bl:r};ctx.beginPath();ctx.moveTo(x+r.tl,y);
-      ctx.lineTo(x+w-r.tr,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r.tr);
-      ctx.lineTo(x+w,y+h-r.br);ctx.quadraticCurveTo(x
+    function drawCard(cx, cy, type, color) {
+      ctx.fillStyle = '#222'; ctx.strokeStyle = '#555'; ctx.lineWidth = 3;
+      roundRect(cx - 90, cy - 100, 180, 200, 12, true, true);
+      ctx.save(); ctx.translate(cx, cy - 30);
+      ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(0, 0, 20, 12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath();
+      ctx.ellipse(-8, -15, 12, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(8, -15, 12, 6, 0, 0, Math
